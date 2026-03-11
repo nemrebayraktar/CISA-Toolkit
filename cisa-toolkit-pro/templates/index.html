@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CISA IT Audit Toolkit</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg-0: #080a0f;
+    --bg-1: #0d1017;
+    --bg-2: #13171f;
+    --bg-3: #191e28;
+    --bg-4: #1f2533;
+    --border: #232a38;
+    --border-h: #2f3848;
+    --txt: #c9d1dc;
+    --txt-2: #7b8a9e;
+    --txt-3: #4a566b;
+    --blue: #38bdf8;
+    --teal: #2dd4bf;
+    --red: #f43f5e;
+    --amber: #f59e0b;
+    --green: #22c55e;
+    --violet: #a78bfa;
+    --mono: 'DM Mono', 'Menlo', monospace;
+    --sans: 'DM Sans', system-ui, sans-serif;
+    --radius: 10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:14px}
+body{font-family:var(--sans);background:var(--bg-0);color:var(--txt);min-height:100vh;display:flex}
+
+/* ═══ SIDEBAR ═══ */
+.sidebar{
+    width:260px;min-height:100vh;background:var(--bg-1);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;flex-shrink:0;position:fixed;left:0;top:0;bottom:0;z-index:10;
+}
+.sidebar-brand{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.sidebar-brand h1{font-size:15px;font-weight:700;color:var(--txt);letter-spacing:-0.3px;display:flex;align-items:center;gap:10px}
+.sidebar-brand h1 .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(34,197,94,0.5);flex-shrink:0}
+.sidebar-brand span{font-size:11px;color:var(--txt-3);font-weight:400;display:block;margin-top:4px;font-family:var(--mono)}
+
+.sidebar-nav{flex:1;padding:12px 10px;overflow-y:auto}
+.nav-group{margin-bottom:16px}
+.nav-group-label{font-size:10px;font-weight:600;color:var(--txt-3);letter-spacing:1.5px;text-transform:uppercase;padding:6px 12px;margin-bottom:2px}
+.nav-item{
+    display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;
+    cursor:pointer;transition:all .15s;font-size:13px;font-weight:500;color:var(--txt-2);border:1px solid transparent;
+}
+.nav-item:hover{background:var(--bg-2);color:var(--txt)}
+.nav-item.active{background:var(--bg-3);color:var(--blue);border-color:var(--border)}
+.nav-item .ico{width:20px;text-align:center;font-size:14px;flex-shrink:0}
+.nav-item .badge{margin-left:auto;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg-4);color:var(--txt-3)}
+
+.sidebar-footer{padding:16px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--txt-3);font-family:var(--mono)}
+
+/* ═══ MAIN ═══ */
+.main{margin-left:260px;flex:1;min-height:100vh;display:flex;flex-direction:column}
+
+.topbar{
+    height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;
+    padding:0 28px;gap:16px;background:var(--bg-1);position:sticky;top:0;z-index:5;
+}
+.topbar .breadcrumb{font-size:12px;color:var(--txt-3);font-family:var(--mono)}
+.topbar .breadcrumb em{color:var(--txt-2);font-style:normal}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.btn-sm{
+    padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;font-family:var(--sans);
+    border:1px solid var(--border);background:var(--bg-3);color:var(--txt-2);cursor:pointer;transition:all .15s;
+}
+.btn-sm:hover{border-color:var(--blue);color:var(--blue)}
+.btn-sm.primary{background:var(--blue);border-color:var(--blue);color:var(--bg-0)}
+.btn-sm.primary:hover{opacity:.9}
+
+.content{flex:1;padding:28px;overflow-y:auto}
+
+/* ═══ PANELS ═══ */
+.panel{display:none;animation:fadeUp .3s ease}
+.panel.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.panel-title{font-size:18px;font-weight:700;margin-bottom:6px}
+.panel-desc{font-size:13px;color:var(--txt-2);margin-bottom:24px}
+
+/* ═══ DASHBOARD HOME ═══ */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.dash-card{
+    padding:20px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);
+    cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+}
+.dash-card:hover{border-color:var(--border-h);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.dash-card .card-ico{font-size:24px;margin-bottom:12px}
+.dash-card .card-name{font-size:14px;font-weight:600;margin-bottom:4px}
+.dash-card .card-sub{font-size:11px;color:var(--txt-3);line-height:1.4}
+.dash-card .card-tag{
+    position:absolute;top:12px;right:12px;font-family:var(--mono);font-size:10px;
+    padding:2px 8px;border-radius:6px;background:var(--bg-4);color:var(--txt-3);
+}
+
+/* ═══ TOOL BUTTONS ═══ */
+.tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:24px}
+.tool-btn{
+    display:flex;align-items:center;gap:12px;padding:14px 16px;
+    background:var(--bg-2);border:1px solid var(--border);border-radius:8px;
+    cursor:pointer;transition:all .15s;font-family:var(--sans);color:var(--txt);font-size:13px;
+}
+.tool-btn:hover{border-color:var(--border-h);background:var(--bg-3)}
+.tool-btn .t-ico{
+    width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:16px;background:var(--bg-4);flex-shrink:0;
+}
+.tool-btn .t-label{font-weight:600}
+.tool-btn .t-sub{font-size:11px;color:var(--txt-3);margin-top:1px}
+.tool-btn.loading{opacity:.6;pointer-events:none}
+.tool-btn.loading::after{
+    content:'';width:14px;height:14px;border:2px solid var(--blue);border-top-color:transparent;
+    border-radius:50%;animation:spin .5s linear infinite;margin-left:auto;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ═══ INPUT ROW ═══ */
+.input-row{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.inp{
+    padding:10px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--txt);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s;
+}
+.inp:focus{border-color:var(--blue)}
+.inp::placeholder{color:var(--txt-3)}
+.inp-grow{flex:1;min-width:140px}
+
+/* ═══ RESULTS BOX ═══ */
+.results{
+    background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius);
+    overflow:hidden;display:none;
+}
+.results.show{display:block}
+.res-bar{
+    display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+    background:var(--bg-2);border-bottom:1px solid var(--border);
+}
+.res-bar h4{font-size:12px;font-weight:600;color:var(--txt-2);font-family:var(--mono)}
+.res-body{padding:16px;max-height:520px;overflow-y:auto}
+.res-body::-webkit-scrollbar{width:5px}
+.res-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ═══ DATA ELEMENTS ═══ */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.st{text-align:center;padding:16px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px}
+.st .v{font-family:var(--mono);font-size:24px;font-weight:700}
+.st .l{font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+
+table.dt{width:100%;border-collapse:collapse;font-size:12px}
+table.dt th{text-align:left;padding:8px 12px;color:var(--txt-3);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+table.dt td{padding:8px 12px;border-bottom:1px solid rgba(35,42,56,.5);font-family:var(--mono);font-size:12px}
+table.dt tr:hover td{background:rgba(56,189,248,.02)}
+
+.code{background:var(--bg-0);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--txt-2);white-space:pre-wrap;word-break:break-all;max-height:280px;overflow-y:auto}
+
+.badge-r{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.5px}
+.b-CRITICAL,.b-critical{background:rgba(244,63,94,.1);color:var(--red);border:1px solid rgba(244,63,94,.2)}
+.b-HIGH,.b-high{background:rgba(245,158,11,.1);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+.b-MEDIUM,.b-medium{background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.2)}
+.b-LOW,.b-low{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.b-INFO,.b-info{background:rgba(56,189,248,.1);color:var(--blue);border:1px solid rgba(56,189,248,.2)}
+
+.finding{padding:12px;background:var(--bg-2);border-radius:8px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px;border-left:3px solid var(--border)}
+.finding.s-CRITICAL,.finding.s-critical{border-left-color:var(--red)}
+.finding.s-HIGH,.finding.s-high{border-left-color:var(--amber)}
+.finding.s-MEDIUM,.finding.s-medium{border-left-color:#fbbf24}
+.finding.s-LOW,.finding.s-low{border-left-color:var(--green)}
+.finding.s-INFO,.finding.s-info{border-left-color:var(--blue)}
+.finding-txt{font-size:13px;flex:1}
+.finding-txt strong{color:var(--txt)}
+.finding-txt small{display:block;color:var(--txt-3);margin-top:3px;font-size:11px}
+
+/* Compliance */
+.comp-score{text-align:center;margin:20px 0}
+.comp-ring{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-family:var(--mono);font-size:32px;font-weight:700;border:4px solid}
+.check-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px}
+.check-ico{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.check-ico.pass{background:rgba(34,197,94,.1)}
+.check-ico.fail{background:rgba(244,63,94,.1)}
+.check-info{flex:1}
+.check-info .cn{font-weight:600;font-size:13px}
+.check-info .cd{font-size:11px;color:var(--txt-3)}
+.check-info .cc{font-size:10px;color:var(--txt-3);font-family:var(--mono)}
+
+/* Report modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg-2);border:1px solid var(--border);border-radius:12px;width:480px;max-width:90vw;padding:28px}
+.modal h3{font-size:16px;margin-bottom:16px}
+.modal label{display:block;font-size:12px;color:var(--txt-2);margin-bottom:4px;margin-top:12px}
+.modal input,.modal select{width:100%;padding:10px;background:var(--bg-0);border:1px solid var(--border);border-radius:8px;color:var(--txt);font-family:var(--sans);font-size:13px;outline:none}
+.modal input:focus,.modal select:focus{border-color:var(--blue)}
+.modal-actions{display:flex;gap:10px;margin-top:24px;justify-content:flex-end}
+
+.empty{text-align:center;padding:50px 20px;color:var(--txt-3)}
+.empty .e-ico{font-size:36px;margin-bottom:12px;opacity:.4}
+.empty p{font-size:13px}
+
+@media(max-width:900px){
+    .sidebar{width:60px}
+    .sidebar .nav-item span:not(.ico),.sidebar-brand span,.sidebar-brand h1 span:not(.dot),.nav-group-label,.sidebar-footer{display:none}
+    .sidebar-brand h1{justify-content:center}
+    .nav-item{justify-content:center;padding:10px}
+    .nav-item .badge{display:none}
+    .main{margin-left:60px}
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <h1><span class="dot"></span>Audit Toolkit</h1>
+        <span>CISA Professional v2.0</span>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="nav-group">
+            <div class="nav-group-label">Genel</div>
+            <div class="nav-item active" data-panel="home"><span class="ico">◉</span>Dashboard</div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-label">Denetim Araçları</div>
+            <div class="nav-item" data-panel="access"><span class="ico">⊡</span>Erişim Kontrol<span class="badge">6</span></div>
+            <div class="nav-item" data-panel="network"><span class="ico">◎</span>Ağ Güvenlik<span class="badge">8</span></div>
+            <div class="nav-item" data-panel="system"><span class="ico">⊞</span>Sistem Denetim<span class="badge">8</span></div>
+            <div class="nav-item" data-panel="logs"><span class="ico">☰</span>Log Analizi<span class="badge">4</span></div>
+            <div class="nav-item" data-panel="vuln"><span class="ico">⚠</span>Zafiyet Tarama<span class="badge">2</span></div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-label">Raporlama</div>
+            <div class="nav-item" data-panel="compliance"><span class="ico">✓</span>Uyumluluk</div>
+            <div class="nav-item" onclick="openReportModal()"><span class="ico">⎙</span>Rapor Oluştur</div>
+        </div>
+    </nav>
+    <div class="sidebar-footer">v2.0 — localhost:5000</div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+    <header class="topbar">
+        <div class="breadcrumb">toolkit / <em id="bc-current">dashboard</em></div>
+        <div class="topbar-right">
+            <button class="btn-sm" onclick="openReportModal()">⎙ Rapor</button>
+            <button class="btn-sm primary" onclick="nav('compliance')">Tam Tarama</button>
+        </div>
+    </header>
+
+    <div class="content">
+
+        <!-- HOME -->
+        <div id="p-home" class="panel active">
+            <div class="panel-title">Dashboard</div>
+            <div class="panel-desc">CISA domainlerine göre denetim araçları. Bir modül seçerek başlayın.</div>
+            <div class="dash-grid">
+                <div class="dash-card" onclick="nav('access')"><div class="card-tag">6 araç</div><div class="card-ico">⊡</div><div class="card-name">Erişim Kontrol</div><div class="card-sub">Kullanıcılar, sudo, parola politikası, dosya izinleri, gruplar, giriş kayıtları</div></div>
+                <div class="dash-card" onclick="nav('network')"><div class="card-tag">8 araç</div><div class="card-ico">◎</div><div class="card-name">Ağ Güvenlik</div><div class="card-sub">Port tarama, bağlantılar, firewall, DNS, SSL, WHOIS, ARP, route</div></div>
+                <div class="dash-card" onclick="nav('system')"><div class="card-tag">8 araç</div><div class="card-ico">⊞</div><div class="card-name">Sistem Denetim</div><div class="card-sub">OS bilgisi, güncellemeler, servisler, SSH, kernel, disk, process, cron</div></div>
+                <div class="dash-card" onclick="nav('logs')"><div class="card-tag">4 araç</div><div class="card-ico">☰</div><div class="card-name">Log Analizi</div><div class="card-sub">Auth, sistem, ağ ve kernel loglarında anomali tespiti</div></div>
+                <div class="dash-card" onclick="nav('vuln')"><div class="card-tag">2 araç</div><div class="card-ico">⚠</div><div class="card-name">Zafiyet Tarama</div><div class="card-sub">Nmap entegrasyonu ve OS CVE kontrolü</div></div>
+                <div class="dash-card" onclick="nav('compliance')"><div class="card-tag">16 kontrol</div><div class="card-ico">✓</div><div class="card-name">Uyumluluk</div><div class="card-sub">CISA çerçevesinde tam uyumluluk taraması ve skorlama</div></div>
+            </div>
+        </div>
+
+        <!-- ACCESS -->
+        <div id="p-access" class="panel">
+            <div class="panel-title">Erişim Kontrol Denetimi</div>
+            <div class="panel-desc">Kullanıcı hesapları, yetkiler, parola politikaları ve kimlik doğrulama kontrolleri — CISA Domain 5</div>
+            <div class="tool-grid">
+                <button class="tool-btn" onclick="run('access/users',this,'r-access')"><div class="t-ico">👤</div><div><div class="t-label">Kullanıcı Analizi</div><div class="t-sub">Tüm hesapları incele</div></div></button>
+                <button class="tool-btn" onclick="run('access/sudo',this,'r-access')"><div class="t-ico">⚡</div><div><div class="t-label">Sudo Kullanıcıları</div><div class="t-sub">Yüksek yetkili hesaplar</div></div></button>
+                <button class="tool-btn" onclick="run('access/password-policy',this,'r-access')"><div class="t-ico">🔑</div><div><div class="t-label">Parola Politikası</div><div class="t-sub">Şifre güvenlik kuralları</div></div></button>
+                <button class="tool-btn" onclick="run('access/logins',this,'r-access')"><div class="t-ico">📋</div><div><div class="t-label">Giriş Kayıtları</div><div class="t-sub">Son ve başarısız girişler</div></div></button>
+                <button class="tool-btn" onclick="run('access/file-permissions',this,'r-access')"><div class="t-ico">📁</div><div><div class="t-label">Dosya İzinleri</div><div class="t-sub">Kritik dosya yetkileri, SUID/SGID</div></div></button>
+                <button class="tool-btn" onclick="run('access/groups',this,'r-access')"><div class="t-ico">👥</div><div><div class="t-label">Grup Üyelikleri</div><div class="t-sub">Kullanıcı gruplarını analiz et</div></div></button>
+            </div>
+            <div id="r-access" class="results"><div class="res-bar"><h4>SONUÇLAR</h4><span id="rb-access"></span></div><div class="res-body" id="rd-access"></div></div>
+        </div>
+
+        <!-- NETWORK -->
+        <div id="p-network" class="panel">
+            <div class="panel-title">Ağ Güvenlik Tarayıcı</div>
+            <div class="panel-desc">Port tarama, bağlantı analizi, firewall ve ağ güvenlik kontrolleri — CISA Domain 5</div>
+            <div class="input-row">
+                <input type="text" id="sc-target" class="inp inp-grow" placeholder="Hedef IP / hostname" value="127.0.0.1">
+                <input type="text" id="sc-ports" class="inp" style="width:140px" placeholder="Port aralığı" value="1-1024">
+                <input type="number" id="sc-threads" class="inp" style="width:100px" placeholder="Thread" value="200">
+                <button class="btn-sm primary" onclick="portScan()">Tara</button>
+            </div>
+            <div class="tool-grid">
+                <button class="tool-btn" onclick="run('network/connections',this,'r-net')"><div class="t-ico">🔗</div><div><div class="t-label">Aktif Bağlantılar</div><div class="t-sub">Dinleyen servisler</div></div></button>
+                <button class="tool-btn" onclick="run('network/firewall',this,'r-net')"><div class="t-ico">🧱</div><div><div class="t-label">Firewall</div><div class="t-sub">UFW / iptables</div></div></button>
+                <button class="tool-btn" onclick="dnsCheck()"><div class="t-ico">🌐</div><div><div class="t-label">DNS Kontrolü</div><div class="t-sub">Domain çözümleme</div></div></button>
+                <button class="tool-btn" onclick="sslCheck()"><div class="t-ico">🔒</div><div><div class="t-label">SSL/TLS Analizi</div><div class="t-sub">Sertifika ve şifreleme</div></div></button>
+                <button class="tool-btn" onclick="whoisCheck()"><div class="t-ico">🔎</div><div><div class="t-label">WHOIS</div><div class="t-sub">Domain kayıt bilgisi</div></div></button>
+                <button class="tool-btn" onclick="run('network/arp',this,'r-net')"><div class="t-ico">📡</div><div><div class="t-label">ARP Tablosu</div><div class="t-sub">Yerel ağ cihazları</div></div></button>
+                <button class="tool-btn" onclick="run('network/routes',this,'r-net')"><div class="t-ico">🗺</div><div><div class="t-label">Routing & Interfaces</div><div class="t-sub">Yönlendirme tablosu</div></div></button>
+            </div>
+            <div id="r-net" class="results"><div class="res-bar"><h4>SONUÇLAR</h4><span id="rb-net"></span></div><div class="res-body" id="rd-net"></div></div>
+        </div>
+
+        <!-- SYSTEM -->
+        <div id="p-system" class="panel">
+            <div class="panel-title">Sistem Yapılandırma Denetimi</div>
+            <div class="panel-desc">İşletim sistemi sertleştirme, servisler ve yapılandırma kontrolleri — CISA Domain 4</div>
+            <div class="tool-grid">
+                <button class="tool-btn" onclick="run('system/info',this,'r-sys')"><div class="t-ico">💻</div><div><div class="t-label">Sistem Bilgisi</div><div class="t-sub">OS, CPU, RAM, disk</div></div></button>
+                <button class="tool-btn" onclick="run('system/updates',this,'r-sys')"><div class="t-ico">📦</div><div><div class="t-label">Güncelleme Kontrolü</div><div class="t-sub">Bekleyen yamalar</div></div></button>
+                <button class="tool-btn" onclick="run('system/services',this,'r-sys')"><div class="t-ico">🔄</div><div><div class="t-label">Servisler</div><div class="t-sub">Çalışan ve aktif</div></div></button>
+                <button class="tool-btn" onclick="run('system/ssh',this,'r-sys')"><div class="t-ico">🔐</div><div><div class="t-label">SSH Yapılandırma</div><div class="t-sub">Güvenlik denetimi</div></div></button>
+                <button class="tool-btn" onclick="run('system/kernel-params',this,'r-sys')"><div class="t-ico">⚙️</div><div><div class="t-label">Kernel Parametreleri</div><div class="t-sub">Sysctl güvenlik</div></div></button>
+                <button class="tool-btn" onclick="run('system/cron',this,'r-sys')"><div class="t-ico">⏰</div><div><div class="t-label">Zamanlanmış Görevler</div><div class="t-sub">Cron & at jobs</div></div></button>
+                <button class="tool-btn" onclick="run('system/processes',this,'r-sys')"><div class="t-ico">📊</div><div><div class="t-label">Çalışan Processler</div><div class="t-sub">Bellek kullanımına göre</div></div></button>
+                <button class="tool-btn" onclick="run('system/disk-encryption',this,'r-sys')"><div class="t-ico">🔏</div><div><div class="t-label">Disk Şifreleme</div><div class="t-sub">LUKS / FileVault</div></div></button>
+            </div>
+            <div id="r-sys" class="results"><div class="res-bar"><h4>SONUÇLAR</h4><span id="rb-sys"></span></div><div class="res-body" id="rd-sys"></div></div>
+        </div>
+
+        <!-- LOGS -->
+        <div id="p-logs" class="panel">
+            <div class="panel-title">Log Analizi</div>
+            <div class="panel-desc">Sistem ve güvenlik loglarında anomali tespiti — CISA Domain 4</div>
+            <div class="tool-grid">
+                <button class="tool-btn" onclick="run('logs/auth',this,'r-log')"><div class="t-ico">🔐</div><div><div class="t-label">Auth Logları</div><div class="t-sub">Kimlik doğrulama kayıtları</div></div></button>
+                <button class="tool-btn" onclick="run('logs/system',this,'r-log')"><div class="t-ico">🖥</div><div><div class="t-label">Sistem Logları</div><div class="t-sub">Hata ve uyarılar</div></div></button>
+                <button class="tool-btn" onclick="run('logs/network',this,'r-log')"><div class="t-ico">🌐</div><div><div class="t-label">Ağ Logları</div><div class="t-sub">Firewall & bağlantı</div></div></button>
+                <button class="tool-btn" onclick="run('logs/kernel',this,'r-log')"><div class="t-ico">⚙️</div><div><div class="t-label">Kernel Logları</div><div class="t-sub">dmesg hata/uyarı</div></div></button>
+            </div>
+            <div id="r-log" class="results"><div class="res-bar"><h4>SONUÇLAR</h4><span id="rb-log"></span></div><div class="res-body" id="rd-log"></div></div>
+        </div>
+
+        <!-- VULN -->
+        <div id="p-vuln" class="panel">
+            <div class="panel-title">Zafiyet Tarama</div>
+            <div class="panel-desc">Nmap tabanlı zafiyet tespiti ve OS güvenlik kontrolü</div>
+            <div class="input-row">
+                <input type="text" id="nm-target" class="inp inp-grow" placeholder="Hedef IP" value="127.0.0.1">
+                <select id="nm-type" class="inp" style="width:180px">
+                    <option value="basic">Temel Tarama</option>
+                    <option value="aggressive">Agresif Tarama</option>
+                    <option value="vuln">Zafiyet Scripts</option>
+                    <option value="full">Tam Tarama (Yavaş)</option>
+                    <option value="udp">UDP Tarama</option>
+                    <option value="stealth">Stealth Tarama</option>
+                </select>
+                <button class="btn-sm primary" onclick="nmapScan()">Nmap Tara</button>
+            </div>
+            <div class="tool-grid">
+                <button class="tool-btn" onclick="run('vuln/os-cve',this,'r-vuln')"><div class="t-ico">🐛</div><div><div class="t-label">OS CVE Kontrolü</div><div class="t-sub">Kernel ve paket güvenliği</div></div></button>
+            </div>
+            <div id="r-vuln" class="results"><div class="res-bar"><h4>SONUÇLAR</h4><span id="rb-vuln"></span></div><div class="res-body" id="rd-vuln"></div></div>
+        </div>
+
+        <!-- COMPLIANCE -->
+        <div id="p-compliance" class="panel">
+            <div class="panel-title">Uyumluluk Kontrolü</div>
+            <div class="panel-desc">CISA çerçevesinde kapsamlı güvenlik taraması — 16 otomatik kontrol</div>
+            <div style="text-align:center;margin-bottom:24px"><button class="btn-sm primary" style="padding:12px 32px;font-size:14px" onclick="compScan()">Tam Uyumluluk Taraması Başlat</button></div>
+            <div id="comp-out" style="display:none">
+                <div id="comp-score" class="comp-score"></div>
+                <div id="comp-stats" class="stats-row"></div>
+                <div id="comp-checks"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- REPORT MODAL -->
+<div class="modal-overlay" id="report-modal">
+    <div class="modal">
+        <h3>📄 Denetim Raporu Oluştur</h3>
+        <label>Denetçi Adı</label>
+        <input type="text" id="rpt-auditor" placeholder="Ad Soyad">
+        <label>Kurum Adı</label>
+        <input type="text" id="rpt-org" placeholder="Kurum / Şirket Adı">
+        <label>Denetim Kapsamı</label>
+        <input type="text" id="rpt-scope" placeholder="örn: Genel IT Güvenlik Denetimi" value="Genel IT Güvenlik Denetimi">
+        <div class="modal-actions">
+            <button class="btn-sm" onclick="closeReportModal()">İptal</button>
+            <button class="btn-sm primary" onclick="genReport()">Rapor Oluştur</button>
+        </div>
+        <div id="rpt-status" style="margin-top:12px;font-size:12px;color:var(--txt-3)"></div>
+    </div>
+</div>
+
+<script>
+// ═══ NAV ═══
+function nav(id){
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.getElementById('p-'+id).classList.add('active');
+    document.querySelector(`.nav-item[data-panel="${id}"]`)?.classList.add('active');
+    document.getElementById('bc-current').textContent=id;
+}
+document.querySelectorAll('.nav-item[data-panel]').forEach(el=>{
+    el.addEventListener('click',()=>nav(el.dataset.panel));
+});
+
+// ═══ API ═══
+async function api(ep,method='GET',body=null){
+    const o={method,headers:{'Content-Type':'application/json'}};
+    if(body)o.body=JSON.stringify(body);
+    const r=await fetch('/api/'+ep,o);
+    return await r.json();
+}
+
+// ═══ GENERIC RUN ═══
+async function run(ep,btn,cid){
+    btn.classList.add('loading');
+    const c=document.getElementById(cid);
+    const sec=cid.replace('r-','');
+    const bd=document.getElementById('rd-'+sec);
+    const rb=document.getElementById('rb-'+sec);
+    try{
+        const d=await api(ep);
+        c.classList.add('show');
+        if(rb&&d.risk_level)rb.innerHTML=`<span class="badge-r b-${d.risk_level}">${d.risk_level}</span>`;
+        bd.innerHTML=render(ep,d);
+    }catch(e){
+        bd.innerHTML=`<div class="finding s-HIGH"><span class="finding-txt">Hata: ${e.message}</span></div>`;
+        c.classList.add('show');
+    }
+    btn.classList.remove('loading');
+}
+
+// ═══ RENDERERS ═══
+function render(ep,d){
+    const m={
+        'access/users':()=>{
+            let h=`<div class="stats-row"><div class="st"><div class="v">${d.total}</div><div class="l">Toplam</div></div><div class="st"><div class="v">${d.login_capable}</div><div class="l">Giriş Yapabilen</div></div><div class="st"><div class="v" style="color:var(--red)">${d.root_count}</div><div class="l">Root</div></div></div>`;
+            h+=`<table class="dt"><tr><th>Kullanıcı</th><th>UID</th><th>Tip</th><th>Shell</th><th>Giriş</th></tr>`;
+            d.users.filter(u=>u.login_capable||u.type==='root').forEach(u=>{
+                const c=u.type==='root'?'var(--red)':u.type==='normal'?'var(--green)':'var(--txt-3)';
+                h+=`<tr><td>${u.username}</td><td>${u.uid}</td><td style="color:${c}">${u.type}</td><td>${u.shell}</td><td>${u.login_capable?'✓':'—'}</td></tr>`;
+            });
+            return h+'</table>';
+        },
+        'access/sudo':()=>{
+            let h=`<div class="stats-row"><div class="st"><div class="v">${d.count}</div><div class="l">Sudo Kullanıcı</div></div></div>`;
+            d.sudo_users.forEach(u=>{h+=`<div class="finding s-HIGH"><span class="finding-txt"><strong>${u}</strong> — sudo yetkisine sahip</span></div>`});
+            if(d.sudoers_config)h+=`<div class="code">${d.sudoers_config}</div>`;
+            return h;
+        },
+        'access/password-policy':()=>{
+            let h='';
+            d.findings.forEach(f=>{h+=`<div class="finding s-${f.severity}"><span class="badge-r b-${f.severity}">${f.severity}</span><span class="finding-txt"><strong>${f.finding}</strong><small>${f.detail} — ${f.recommendation}</small></span></div>`});
+            return h;
+        },
+        'access/logins':()=>`<div class="code">${d.last_logins}</div><h4 style="margin:12px 0 6px;font-size:12px;color:var(--red)">Başarısız Girişler:</h4><div class="code">${d.failed_logins}</div><h4 style="margin:12px 0 6px;font-size:12px;color:var(--blue)">Aktif Oturumlar:</h4><div class="code">${d.current_sessions||'Yok'}</div>`,
+        'access/file-permissions':()=>{
+            let h='<table class="dt"><tr><th>Dosya</th><th>Beklenen</th><th>Mevcut</th><th>Durum</th></tr>';
+            d.permission_checks.forEach(c=>{
+                const cl=c.status==='PASS'?'var(--green)':c.status==='FAIL'?'var(--red)':'var(--txt-3)';
+                h+=`<tr><td>${c.file}</td><td>${c.expected}</td><td>${c.actual}</td><td style="color:${cl}">${c.status}</td></tr>`;
+            });
+            h+='</table>';
+            if(d.suid_files)h+=`<h4 style="margin:12px 0 6px;font-size:12px;color:var(--amber)">SUID Dosyaları:</h4><div class="code">${d.suid_files}</div>`;
+            if(d.world_writable&&!d.world_writable.includes('bulunamadı'))h+=`<h4 style="margin:12px 0 6px;font-size:12px;color:var(--red)">World-Writable:</h4><div class="code">${d.world_writable}</div>`;
+            return h;
+        },
+        'access/groups':()=>{
+            let h=`<div class="stats-row"><div class="st"><div class="v">${d.total}</div><div class="l">Aktif Grup</div></div></div>`;
+            h+='<table class="dt"><tr><th>Grup</th><th>GID</th><th>Üyeler</th></tr>';
+            d.groups.forEach(g=>{h+=`<tr><td>${g.name}</td><td>${g.gid}</td><td>${g.members.join(', ')}</td></tr>`});
+            return h+'</table>';
+        },
+        'network/connections':()=>`<div class="stats-row"><div class="st"><div class="v">${d.listen_count}</div><div class="l">Dinleyen</div></div><div class="st"><div class="v">${d.established_count}</div><div class="l">Kurulu</div></div></div><div class="code">${d.listening}</div>`,
+        'network/firewall':()=>{
+            const s=d.firewall_active;
+            return `<div class="finding s-${s?'INFO':'CRITICAL'}"><span class="finding-txt">${s?'✅ Firewall AKTİF':'❌ Firewall AKTİF DEĞİL!'}</span></div><div class="code">${d.ufw_status||''}\n\n${d.iptables||''}</div>`;
+        },
+        'network/arp':()=>`<div class="code">${d.arp_table}</div>`,
+        'network/routes':()=>`<h4 style="font-size:12px;color:var(--blue);margin-bottom:6px">Routing Table:</h4><div class="code">${d.routing_table}</div><h4 style="font-size:12px;color:var(--blue);margin:12px 0 6px">Interfaces:</h4><div class="code">${d.interfaces}</div>`,
+        'system/info':()=>`<div class="stats-row"><div class="st"><div class="v" style="font-size:14px">${d.os}</div><div class="l">OS</div></div><div class="st"><div class="v" style="font-size:14px">${d.hostname}</div><div class="l">Hostname</div></div><div class="st"><div class="v" style="font-size:12px">${d.kernel}</div><div class="l">Kernel</div></div></div><div class="code">CPU: ${d.cpu||'N/A'}\n\nMemory:\n${d.memory||'N/A'}\n\nDisk:\n${d.disk||'N/A'}\n\nUptime: ${d.uptime||'N/A'}\nLoad: ${d.load||'N/A'}</div>`,
+        'system/updates':()=>`<div class="stats-row"><div class="st"><div class="v">${d.pending_count}</div><div class="l">Bekleyen</div></div></div><div class="code">${d.os_updates}</div>`,
+        'system/services':()=>`<div class="code">${d.running_services}</div>${d.enabled_services?'<h4 style="font-size:12px;color:var(--blue);margin:12px 0 6px">Enabled:</h4><div class="code">'+d.enabled_services+'</div>':''}`,
+        'system/ssh':()=>{let h='';d.findings.forEach(f=>{h+=`<div class="finding s-${f.severity}"><span class="badge-r b-${f.severity}">${f.severity}</span><span class="finding-txt"><strong>${f.finding}</strong><small>${f.recommendation}</small></span></div>`});h+=`<div class="code">${d.config}</div>`;return h},
+        'system/kernel-params':()=>{
+            let h='';
+            d.findings.forEach(f=>{h+=`<div class="finding s-${f.severity}"><span class="badge-r b-${f.severity}">${f.severity}</span><span class="finding-txt"><strong>${f.finding}</strong><small>${f.recommendation}</small></span></div>`});
+            h+='<table class="dt"><tr><th>Parametre</th><th>Değer</th></tr>';
+            for(const[k,v] of Object.entries(d.params)){h+=`<tr><td>${k}</td><td>${v||'N/A'}</td></tr>`}
+            return h+'</table>';
+        },
+        'system/cron':()=>`<div class="code">${d.user_crontab}</div><h4 style="margin:12px 0 6px;font-size:12px;color:var(--blue)">Sistem Cron:</h4><div class="code">${d.system_cron}</div>`,
+        'system/processes':()=>`<div class="code">${d.processes}</div>`,
+        'system/disk-encryption':()=>`<div class="finding s-${d.encrypted?'INFO':'CRITICAL'}"><span class="finding-txt">${d.encrypted?'✅ Disk şifreleme aktif':'❌ Disk şifreleme tespit edilemedi!'}</span></div><div class="code">${d.block_devices}\n\n${d.encryption_status}</div>`,
+        'logs/auth':()=>`<div class="stats-row"><div class="st"><div class="v" style="color:var(--red)">${d.failed_attempts}</div><div class="l">Başarısız</div></div><div class="st"><div class="v" style="color:var(--green)">${d.successful_logins}</div><div class="l">Başarılı</div></div></div>${d.brute_force_suspected?'<div class="finding s-CRITICAL"><span class="finding-txt"><strong>⚠ Brute-force saldırısı şüphesi!</strong></span></div>':''}<div class="code">${d.logs}</div>`,
+        'logs/system':()=>`<div class="stats-row"><div class="st"><div class="v" style="color:var(--red)">${d.errors}</div><div class="l">Hata</div></div><div class="st"><div class="v" style="color:var(--amber)">${d.warnings}</div><div class="l">Uyarı</div></div></div><div class="code">${d.logs}</div>`,
+        'logs/network':()=>`<div class="stats-row"><div class="st"><div class="v">${d.blocked}</div><div class="l">Engellenen</div></div></div><div class="code">${d.firewall_logs}</div>`,
+        'logs/kernel':()=>`<div class="code">${d.kernel_logs}</div>`,
+        'vuln/os-cve':()=>`<div class="code">Kernel: ${d.kernel}\n\n${d.os_release}\n\nYüklü Paket: ${d.installed_packages}\n\nGüvenlik Güncellemeleri:\n${d.security_updates}</div>`,
+    };
+    return (m[ep]||(()=>`<div class="code">${JSON.stringify(d,null,2)}</div>`))();
+}
+
+// ═══ PORT SCAN ═══
+async function portScan(){
+    const c=document.getElementById('r-net'),bd=document.getElementById('rd-net'),rb=document.getElementById('rb-net');
+    bd.innerHTML='<div class="empty"><div class="e-ico">◎</div><p>Port taraması devam ediyor...</p></div>';
+    c.classList.add('show');
+    try{
+        const d=await api('network/port-scan','POST',{
+            target:document.getElementById('sc-target').value,
+            port_range:document.getElementById('sc-ports').value,
+            threads:parseInt(document.getElementById('sc-threads').value)
+        });
+        rb.innerHTML=`<span class="badge-r b-${d.risk_level}">${d.risk_level}</span>`;
+        let h=`<div class="stats-row"><div class="st"><div class="v">${d.total_open}</div><div class="l">Açık Port</div></div><div class="st"><div class="v" style="font-size:14px">${d.resolved_ip}</div><div class="l">IP</div></div><div class="st"><div class="v" style="font-size:14px">${d.scanned_range}</div><div class="l">Aralık</div></div><div class="st"><div class="v" style="font-size:14px">${d.scan_time}</div><div class="l">Süre</div></div></div>`;
+        if(d.risky_ports.length){h+=`<div class="finding s-HIGH"><span class="finding-txt"><strong>⚠ Riskli portlar açık:</strong> ${d.risky_ports.map(p=>p.port+'/'+p.service).join(', ')}</span></div>`}
+        if(d.open_ports.length){
+            h+='<table class="dt"><tr><th>Port</th><th>Servis</th><th>Banner</th><th>Durum</th></tr>';
+            d.open_ports.forEach(p=>{h+=`<tr><td style="color:var(--blue)">${p.port}</td><td>${p.service}</td><td style="color:var(--txt-3)">${p.banner||'—'}</td><td style="color:var(--green)">open</td></tr>`});
+            h+='</table>';
+        }else{h+='<div class="finding s-INFO"><span class="finding-txt">Açık port bulunamadı.</span></div>'}
+        bd.innerHTML=h;
+    }catch(e){bd.innerHTML=`<div class="finding s-HIGH"><span class="finding-txt">Hata: ${e.message}</span></div>`}
+}
+
+// ═══ DNS ═══
+async function dnsCheck(){
+    const domain=prompt('Domain:','google.com');if(!domain)return;
+    const c=document.getElementById('r-net'),bd=document.getElementById('rd-net');c.classList.add('show');
+    const d=await api('network/dns','POST',{domain});
+    bd.innerHTML=`<div class="finding s-${d.resolves?'INFO':'HIGH'}"><span class="finding-txt"><strong>${d.domain}</strong> — ${d.resolves?'Çözümleme başarılı':'Çözümlenemedi!'}</span></div><div class="code">A Records: ${d.a_records||'—'}\n\nMX Records: ${d.mx_records||'—'}\n\nTXT Records: ${d.txt_records||'—'}\n\n${d.nslookup}</div>`;
+}
+
+// ═══ SSL ═══
+async function sslCheck(){
+    const host=prompt('Host:','google.com');if(!host)return;
+    const c=document.getElementById('r-net'),bd=document.getElementById('rd-net'),rb=document.getElementById('rb-net');
+    c.classList.add('show');bd.innerHTML='<div class="empty"><div class="e-ico">🔒</div><p>SSL analizi...</p></div>';
+    const d=await api('network/ssl-check','POST',{host});
+    if(d.error){bd.innerHTML=`<div class="finding s-HIGH"><span class="finding-txt">Hata: ${d.error}</span></div>`;return}
+    rb.innerHTML=`<span class="badge-r b-${d.risk_level}">${d.risk_level}</span>`;
+    let h=`<div class="stats-row"><div class="st"><div class="v" style="font-size:14px">${d.subject}</div><div class="l">Subject</div></div><div class="st"><div class="v" style="font-size:14px">${d.issuer}</div><div class="l">Issuer</div></div><div class="st"><div class="v" style="font-size:16px;color:${d.days_remaining<30?'var(--red)':'var(--green)'}">${d.days_remaining}d</div><div class="l">Kalan Gün</div></div><div class="st"><div class="v" style="font-size:14px">${d.protocol}</div><div class="l">Protokol</div></div></div>`;
+    d.findings.forEach(f=>{h+=`<div class="finding s-${f.severity}"><span class="badge-r b-${f.severity}">${f.severity}</span><span class="finding-txt">${f.message}</span></div>`});
+    h+=`<div class="code">Cipher: ${d.cipher}\nKey Bits: ${d.key_bits}\nExpires: ${d.expires}\nSAN: ${(d.san||[]).join(', ')}</div>`;
+    bd.innerHTML=h;
+}
+
+// ═══ WHOIS ═══
+async function whoisCheck(){
+    const t=prompt('Hedef:','google.com');if(!t)return;
+    const c=document.getElementById('r-net'),bd=document.getElementById('rd-net');c.classList.add('show');
+    const d=await api('network/whois','POST',{target:t});
+    bd.innerHTML=`<div class="code">${d.whois_data}</div>`;
+}
+
+// ═══ NMAP ═══
+async function nmapScan(){
+    const c=document.getElementById('r-vuln'),bd=document.getElementById('rd-vuln'),rb=document.getElementById('rb-vuln');
+    bd.innerHTML='<div class="empty"><div class="e-ico">⚠</div><p>Nmap taraması devam ediyor... Bu uzun sürebilir.</p></div>';
+    c.classList.add('show');
+    const d=await api('vuln/nmap','POST',{target:document.getElementById('nm-target').value,scan_type:document.getElementById('nm-type').value});
+    if(d.error){bd.innerHTML=`<div class="finding s-HIGH"><span class="finding-txt">${d.error}</span></div>`;return}
+    rb.innerHTML=`<span class="badge-r b-${d.risk_level}">${d.risk_level}</span>`;
+    bd.innerHTML=`<div class="stats-row"><div class="st"><div class="v">${d.open_services}</div><div class="l">Açık Servis</div></div><div class="st"><div class="v" style="color:var(--red)">${d.vulnerabilities_found}</div><div class="l">Zafiyet</div></div></div><div class="code">${d.output}</div>`;
+}
+
+// ═══ COMPLIANCE ═══
+async function compScan(){
+    const out=document.getElementById('comp-out');
+    document.getElementById('comp-score').innerHTML='<div class="empty"><div class="e-ico">✓</div><p>Uyumluluk taraması çalışıyor...</p></div>';
+    out.style.display='block';
+    const d=await api('compliance/full-scan');
+    const sc=d.summary.score;
+    const clr=sc>=80?'var(--green)':sc>=50?'var(--amber)':'var(--red)';
+    document.getElementById('comp-score').innerHTML=`<div class="comp-ring" style="color:${clr};border-color:${clr};background:${clr}10">${sc}%</div><div style="font-size:13px;color:var(--txt-2)">Uyumluluk Skoru</div><div style="margin-top:8px"><span class="badge-r b-${d.risk_level}">${d.risk_level} RİSK</span></div>`;
+    document.getElementById('comp-stats').innerHTML=`<div class="st"><div class="v" style="color:var(--green)">${d.summary.passed}</div><div class="l">Geçti</div></div><div class="st"><div class="v" style="color:var(--red)">${d.summary.failed}</div><div class="l">Başarısız</div></div><div class="st"><div class="v">${d.summary.total}</div><div class="l">Toplam</div></div>`;
+    let ch='';
+    d.checks.forEach(c=>{
+        const ico=c.status==='PASS'?'✓':'✗';
+        const cls=c.status==='PASS'?'pass':'fail';
+        ch+=`<div class="check-row"><div class="check-ico ${cls}">${ico}</div><div class="check-info"><div class="cn">${c.check}</div><div class="cd">${c.detail}</div><div class="cc">${c.category}</div></div><span class="badge-r b-${c.status==='PASS'?'LOW':'CRITICAL'}">${c.status}</span></div>`;
+    });
+    document.getElementById('comp-checks').innerHTML=ch;
+}
+
+// ═══ REPORT ═══
+function openReportModal(){document.getElementById('report-modal').classList.add('show')}
+function closeReportModal(){document.getElementById('report-modal').classList.remove('show')}
+async function genReport(){
+    const st=document.getElementById('rpt-status');
+    st.textContent='Rapor oluşturuluyor...';st.style.color='var(--blue)';
+    const d=await api('report/generate','POST',{
+        auditor:document.getElementById('rpt-auditor').value||'IT Auditor',
+        organization:document.getElementById('rpt-org').value||'Kurum',
+        scope:document.getElementById('rpt-scope').value||'Genel IT Denetimi'
+    });
+    st.innerHTML=`✅ Rapor oluşturuldu! (Skor: ${d.score}%, ${d.findings_count} bulgu)<br><a href="/api/report/download/${d.filename}" style="color:var(--blue);font-weight:600" download>📥 Raporu İndir</a>`;
+    st.style.color='var(--green)';
+}
+</script>
+</body>
+</html>
