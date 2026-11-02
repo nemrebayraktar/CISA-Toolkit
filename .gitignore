@@ -1,0 +1,6 @@
+# yerel olarak üretilen raporlar sistem bilgisi içerir, repoya eklenmez
+cisa-toolkit-pro/reports/
+__pycache__/
+.venv/
+venv/
+.DS_Store

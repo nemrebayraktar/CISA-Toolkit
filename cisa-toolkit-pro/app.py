@@ -1,25 +1,50 @@
 #!/usr/bin/env python3
 """
-CISA IT Audit Toolkit — Professional Edition
-=============================================
-PyWebView + Flask | Multi-threaded scanning | CISA-compliant reporting
+CISA IT Audit Toolkit
+CISA sınavına hazırlanırken IT / BS denetimi pratiği için yazdığım
+Flask tabanlı yerel denetim aracı. ISACA ile bir bağlantısı yoktur.
 
 Kullanım:
-  python3 app.py          → PyWebView native pencere
-  python3 app.py --web    → Tarayıcıda aç
+  python3 app.py          -> PyWebView penceresi (kuruluysa)
+  python3 app.py --web    -> tarayıcıda aç
+  python3 app.py --port 8000
 
-(c) 2025 — Eğitim ve iç denetim amaçlıdır.
+Eğitim ve iç denetim amaçlıdır; yalnızca kendi sistemlerinizde
+veya yazılı izin aldığınız hedeflerde kullanın.
 """
 
 import threading, socket, subprocess, platform, os, re, json, csv, io
-import datetime, ssl, struct, time, ipaddress, hashlib
+import datetime, ssl, struct, time, ipaddress, hashlib, html
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, jsonify, Response, send_file
 from pathlib import Path
 
-app = Flask(__name__)
-REPORTS_DIR = Path(__file__).parent / "reports"
+BASE_DIR = Path(__file__).resolve().parent
+app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
+REPORTS_DIR = BASE_DIR / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
+IS_LINUX = platform.system() == "Linux"
+IS_MAC = platform.system() == "Darwin"
+
+# Uygulama komut çalıştırdığı için sadece bu bilgisayardan erişilebilsin.
+# Host kontrolü DNS rebinding'e, özel başlık kontrolü de başka bir sitenin
+# arka planda POST isteği atmasına karşı.
+@app.before_request
+def sadece_yerel():
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        return jsonify({"error": "Sadece yerel erişim"}), 403
+    host = (request.host or "").rsplit(":", 1)[0].strip("[]")
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        return jsonify({"error": "Geçersiz host"}), 403
+    if request.method == "POST" and request.headers.get("X-Requested-With") != "cisa-toolkit":
+        return jsonify({"error": "Geçersiz istek"}), 403
+
+def gecerli_hedef(t):
+    # komutlara argüman olarak gidiyor; '-' ile başlayan değerler
+    # (ör. nmap -oN...) seçenek gibi yorumlanmasın
+    return isinstance(t, str) and 0 < len(t) <= 253 and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.\-]*', t) is not None
+
+e = lambda v: html.escape(str(v))
 
 # ════════════════════════════════════════════════════════════
 #  YARDIMCI FONKSİYONLAR
@@ -175,11 +200,14 @@ def api_network_portscan():
     d = request.json or {}
     target = d.get("target","127.0.0.1")
     port_range = d.get("port_range","1-1024")
-    threads = min(int(d.get("threads", 200)), 500)
-    timeout = float(d.get("timeout", 0.5))
+    try:
+        threads = max(1, min(int(d.get("threads", 200)), 500))
+        timeout = min(max(float(d.get("timeout", 0.5)), 0.1), 5.0)
+    except (TypeError, ValueError):
+        return jsonify({"error":"Geçersiz thread / timeout değeri"}), 400
     scan_type = d.get("scan_type", "tcp")
 
-    if not re.match(r'^[\w\.\-]+$', target):
+    if not gecerli_hedef(target):
         return jsonify({"error":"Geçersiz hedef"}), 400
 
     try:
@@ -187,6 +215,7 @@ def api_network_portscan():
         start_p, end_p = int(parts[0]), int(parts[1]) if len(parts)>1 else int(parts[0])
         start_p = max(1, start_p)
         end_p = min(65535, end_p)
+        if start_p > end_p: start_p, end_p = end_p, start_p
     except:
         start_p, end_p = 1, 1024
 
@@ -247,7 +276,7 @@ def api_network_firewall():
 def api_network_dns():
     d = request.json or {}
     domain = d.get("domain","google.com")
-    if not re.match(r'^[\w\.\-]+$', domain):
+    if not gecerli_hedef(domain):
         return jsonify({"error":"Geçersiz domain"}), 400
     ns = run_cmd(f"nslookup {domain} 2>/dev/null")
     dig = run_cmd(f"dig {domain} +short 2>/dev/null")
@@ -261,7 +290,7 @@ def api_network_ssl():
     d = request.json or {}
     host = d.get("host","google.com")
     port = int(d.get("port", 443))
-    if not re.match(r'^[\w\.\-]+$', host):
+    if not gecerli_hedef(host):
         return jsonify({"error":"Geçersiz host"}), 400
     try:
         ctx = ssl.create_default_context()
@@ -295,7 +324,7 @@ def api_network_ssl():
 def api_network_whois():
     d = request.json or {}
     target = d.get("target","google.com")
-    if not re.match(r'^[\w\.\-]+$', target):
+    if not gecerli_hedef(target):
         return jsonify({"error":"Geçersiz hedef"}), 400
     out = run_cmd(f"whois {target} 2>/dev/null", timeout=10)
     return jsonify({"target":target,"whois_data":out[:5000],"risk_level":"INFO"})
@@ -411,14 +440,17 @@ def api_system_kernel():
 
 @app.route("/api/system/processes")
 def api_system_processes():
-    ps = run_cmd("ps aux --sort=-%mem 2>/dev/null | head -25 || ps aux | head -25")
+    # macOS'taki ps --sort seçeneğini tanımıyor
+    ps = run_cmd("ps aux -m | head -25" if IS_MAC else "ps aux --sort=-%mem | head -25")
     return jsonify({"processes":ps,"risk_level":"INFO"})
 
 @app.route("/api/system/disk-encryption")
 def api_system_diskenc():
     lsblk = run_cmd("lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINT 2>/dev/null")
     crypt = run_cmd("lsblk -o NAME,FSTYPE 2>/dev/null | grep -i crypt || fdesetup status 2>/dev/null || echo 'Kontrol edilemedi'")
-    encrypted = "crypt" in crypt.lower() or "on" in crypt.lower() if crypt else False
+    # "Kontrol edilemedi" içinde de "on" geçtiği için daha sıkı kontrol
+    low = (crypt or "").lower()
+    encrypted = "crypt" in low or "filevault is on" in low
     return jsonify({"block_devices":lsblk,"encryption_status":crypt,"encrypted":encrypted,
                      "risk_level":"CRITICAL" if not encrypted else "LOW"})
 
@@ -473,7 +505,13 @@ def api_logs_kernel():
 def api_compliance_full():
     checks = []
 
-    def add(cat, name, cmd_or_fn, expect_fn, detail_fn, rec):
+    def add(cat, name, cmd_or_fn, expect_fn, detail_fn, rec, linux_only=False):
+        # Linux'a özgü kontroller (sysctl net.ipv4, login.defs, systemd...) macOS
+        # ve Windows'ta yanlışlıkla FAIL vermesin, N/A olarak geçsin
+        if linux_only and not IS_LINUX:
+            checks.append({"category":cat,"check":name,"status":"N/A",
+                           "detail":f"{platform.system()} üzerinde uygulanamaz","recommendation":rec,"raw":""})
+            return
         if callable(cmd_or_fn):
             val = cmd_or_fn()
         else:
@@ -484,9 +522,14 @@ def api_compliance_full():
                        "detail":detail,"recommendation":rec,"raw":val[:200] if isinstance(val,str) else str(val)[:200]})
 
     # --- Access Control ---
-    add("Erişim Kontrol","Firewall Durumu","ufw status 2>/dev/null",
-        lambda v: "active" in v.lower(), lambda v: "Aktif" if "active" in v.lower() else "Aktif değil",
-        "ufw enable ile aktif edin")
+    if IS_MAC:
+        add("Erişim Kontrol","Firewall Durumu","/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null",
+            lambda v: "enabled" in v.lower(), lambda v: "Aktif" if "enabled" in v.lower() else "Aktif değil",
+            "Sistem Ayarları > Ağ > Güvenlik Duvarı üzerinden aktif edin")
+    else:
+        add("Erişim Kontrol","Firewall Durumu","ufw status 2>/dev/null",
+            lambda v: "status: active" in v.lower(), lambda v: "Aktif" if "status: active" in v.lower() else "Aktif değil / ufw yok",
+            "ufw enable ile aktif edin", linux_only=True)
     add("Erişim Kontrol","SSH Root Girişi","cat /etc/ssh/sshd_config 2>/dev/null",
         lambda v: "PermitRootLogin yes" not in v, lambda v: "Root girişi kapalı" if "PermitRootLogin yes" not in v else "Root girişi açık!",
         "PermitRootLogin no ayarlayın")
@@ -495,37 +538,38 @@ def api_compliance_full():
         "PermitEmptyPasswords no ayarlayın")
     add("Erişim Kontrol","Parola Max Yaş","grep PASS_MAX_DAYS /etc/login.defs 2>/dev/null | grep -v '#' | awk '{print $2}'",
         lambda v: v.isdigit() and int(v)<=90, lambda v: f"{v} gün" if v else "Ayarsız",
-        "PASS_MAX_DAYS ≤ 90 ayarlayın")
+        "PASS_MAX_DAYS ≤ 90 ayarlayın", linux_only=True)
     add("Erişim Kontrol","Parola Min Uzunluk","grep PASS_MIN_LEN /etc/login.defs 2>/dev/null | grep -v '#' | awk '{print $2}'",
         lambda v: v.isdigit() and int(v)>=12, lambda v: f"{v} karakter" if v else "Ayarsız",
-        "PASS_MIN_LEN ≥ 12 ayarlayın")
+        "PASS_MIN_LEN ≥ 12 ayarlayın", linux_only=True)
 
     # --- Network Security ---
     add("Ağ Güvenliği","IP Forwarding","sysctl -n net.ipv4.ip_forward 2>/dev/null",
         lambda v: v == "0", lambda v: "Kapalı" if v=="0" else "Açık",
-        "net.ipv4.ip_forward=0 ayarlayın")
+        "net.ipv4.ip_forward=0 ayarlayın", linux_only=True)
     add("Ağ Güvenliği","SYN Cookies","sysctl -n net.ipv4.tcp_syncookies 2>/dev/null",
         lambda v: v == "1", lambda v: "Aktif" if v=="1" else "Devre dışı",
-        "net.ipv4.tcp_syncookies=1 ayarlayın")
+        "net.ipv4.tcp_syncookies=1 ayarlayın", linux_only=True)
     add("Ağ Güvenliği","ICMP Redirect","sysctl -n net.ipv4.conf.all.accept_redirects 2>/dev/null",
         lambda v: v == "0", lambda v: "Reddediliyor" if v=="0" else "Kabul ediliyor",
-        "ICMP redirect'leri kapatın")
+        "ICMP redirect'leri kapatın", linux_only=True)
 
     # --- System Hardening ---
     add("Sistem Sertleştirme","ASLR","sysctl -n kernel.randomize_va_space 2>/dev/null",
         lambda v: v == "2", lambda v: f"Seviye: {v}" if v else "Kontrol edilemedi",
-        "kernel.randomize_va_space=2 ayarlayın")
+        "kernel.randomize_va_space=2 ayarlayın", linux_only=True)
     add("Sistem Sertleştirme","/tmp İzinleri","stat -c '%a' /tmp 2>/dev/null",
         lambda v: v == "1777", lambda v: f"İzinler: {v}" if v else "N/A",
-        "/tmp sticky bit ayarlayın")
+        "/tmp sticky bit ayarlayın", linux_only=True)
     add("Sistem Sertleştirme","Core Dump","sysctl -n fs.suid_dumpable 2>/dev/null",
         lambda v: v == "0", lambda v: "Kapalı" if v=="0" else "Açık",
-        "fs.suid_dumpable=0 ayarlayın")
+        "fs.suid_dumpable=0 ayarlayın", linux_only=True)
 
     # --- Data Protection ---
     add("Veri Koruma","Disk Şifreleme",
         "lsblk -o FSTYPE 2>/dev/null | grep -ic crypt || fdesetup status 2>/dev/null",
-        lambda v: "1" in v or "on" in v.lower(), lambda v: "Şifreli" if ("1" in v or "on" in v.lower()) else "Şifreleme yok/belirsiz",
+        lambda v: (v.split() or ["0"])[0].isdigit() and int(v.split()[0]) > 0 or "filevault is on" in v.lower(),
+        lambda v: "Şifreli" if ((v.split() or ["0"])[0].isdigit() and int(v.split()[0]) > 0 or "filevault is on" in v.lower()) else "Şifreleme yok/belirsiz",
         "LUKS veya FileVault ile şifreleme aktif edin")
 
     # --- Patch Management ---
@@ -537,19 +581,20 @@ def api_compliance_full():
     # --- Logging & Monitoring ---
     add("Loglama","Audit Daemon","systemctl is-active auditd 2>/dev/null || echo 'inactive'",
         lambda v: "active" in v.lower() and "inactive" not in v.lower(), lambda v: v,
-        "auditd servisini aktif edin")
+        "auditd servisini aktif edin", linux_only=True)
     add("Loglama","Syslog Servisi","systemctl is-active rsyslog 2>/dev/null || systemctl is-active syslog-ng 2>/dev/null || echo 'inactive'",
         lambda v: "active" in v.lower() and "inactive" not in v.lower(), lambda v: v,
-        "rsyslog veya syslog-ng aktif edin")
+        "rsyslog veya syslog-ng aktif edin", linux_only=True)
 
     passed = len([c for c in checks if c["status"]=="PASS"])
     failed = len([c for c in checks if c["status"]=="FAIL"])
-    total = len(checks)
+    total = passed + failed   # N/A olanlar skora katılmıyor
     score = int((passed/total)*100) if total else 0
     risk = "CRITICAL" if score<40 else "HIGH" if score<60 else "MEDIUM" if score<80 else "LOW"
 
     return jsonify({"checks":checks,
-                     "summary":{"total":total,"passed":passed,"failed":failed,"score":score},
+                     "summary":{"total":total,"passed":passed,"failed":failed,"score":score,
+                                "not_applicable":len(checks)-total},
                      "risk_level":risk})
 
 # ════════════════════════════════════════════════════════════
@@ -561,7 +606,7 @@ def api_vuln_nmap():
     d = request.json or {}
     target = d.get("target","127.0.0.1")
     scan_type = d.get("scan_type","basic")
-    if not re.match(r'^[\w\.\-]+$', target):
+    if not gecerli_hedef(target):
         return jsonify({"error":"Geçersiz hedef"}), 400
     nmap_check = run_cmd("which nmap 2>/dev/null")
     if not nmap_check:
@@ -598,14 +643,14 @@ def api_vuln_oscve():
 @app.route("/api/report/generate", methods=["POST"])
 def api_report_generate():
     d = request.json or {}
-    auditor_name = d.get("auditor","IT Auditor")
-    org_name = d.get("organization","Kurum Adı")
-    scope = d.get("scope","Genel IT Denetimi")
+    auditor_name = e(d.get("auditor","IT Auditor"))[:120]
+    org_name = e(d.get("organization","Kurum Adı"))[:120]
+    scope = e(d.get("scope","Genel IT Denetimi"))[:200]
     report_type = d.get("report_type","full")
 
     now = datetime.datetime.now()
-    hostname = socket.gethostname()
-    os_info = f"{platform.system()} {platform.release()}"
+    hostname = e(socket.gethostname())
+    os_info = e(f"{platform.system()} {platform.release()}")
 
     # Compliance verisi topla
     comp_data = None
@@ -644,15 +689,15 @@ def api_report_generate():
                         <span class="finding-risk risk-tag-{risk_rating.lower()}">{risk_rating} Risk</span>
                     </div>
                     <table class="finding-table">
-                        <tr><th>Bulgu Başlığı</th><td>{check['check']}</td></tr>
-                        <tr><th>Kategori</th><td>{check['category']}</td></tr>
-                        <tr><th>Durum</th><td>{check['detail']}</td></tr>
+                        <tr><th>Bulgu Başlığı</th><td>{e(check['check'])}</td></tr>
+                        <tr><th>Kategori</th><td>{e(check['category'])}</td></tr>
+                        <tr><th>Durum</th><td>{e(check['detail'])}</td></tr>
                         <tr><th>Etki (Impact)</th><td>{impact}</td></tr>
                         <tr><th>Olasılık (Likelihood)</th><td>{probability}</td></tr>
                         <tr><th>Risk Derecesi</th><td><strong>{risk_rating}</strong></td></tr>
                         <tr><th>CISA Domain</th><td>Domain 5 — Bilgi Varlıklarının Korunması</td></tr>
                         <tr><th>Referans Standart</th><td>ISO 27001 A.12 / COBIT DSS05 / NIST SP 800-53</td></tr>
-                        <tr><th>Öneri (Recommendation)</th><td>{check['recommendation']}</td></tr>
+                        <tr><th>Öneri (Recommendation)</th><td>{e(check['recommendation'])}</td></tr>
                         <tr><th>Yönetim Yanıtı</th><td style="color:#888;font-style:italic;">[Yönetim tarafından doldurulacak]</td></tr>
                         <tr><th>Hedef Tarih</th><td style="color:#888;font-style:italic;">[Belirlenmesi gereken]</td></tr>
                         <tr><th>Sorumlu</th><td style="color:#888;font-style:italic;">[Atanması gereken]</td></tr>
@@ -760,7 +805,7 @@ def api_report_generate():
 
     <!-- KAPAK -->
     <div class="cover">
-        <h1>🛡 BİLGİ SİSTEMLERİ DENETİM RAPORU</h1>
+        <h1>BİLGİ SİSTEMLERİ DENETİM RAPORU</h1>
         <h2>{org_name}</h2>
         <div class="meta">
             <span>Rapor Tarihi: {now.strftime('%d/%m/%Y %H:%M')}</span>
@@ -775,7 +820,7 @@ def api_report_generate():
     <!-- YÖNETİCİ ÖZETİ -->
     <div class="section">
         <h2>1. Yönetici Özeti (Executive Summary)</h2>
-        <p>Bu denetim raporu, {org_name} bilgi sistemlerinin güvenlik durumunu CISA (Certified Information Systems Auditor) standartları çerçevesinde değerlendirmektedir. Denetim, ISACA CISA Review Manual'da tanımlanan beş domain kapsamında gerçekleştirilmiştir.</p>
+        <p>Bu rapor, {org_name} kapsamında incelenen sistemin ({hostname}) teknik güvenlik kontrollerinin otomatik tarama sonuçlarını içermektedir. Kontroller ağırlıklı olarak CISA Domain 4 (Bilgi Sistemleri Operasyonları) ve Domain 5 (Bilgi Varlıklarının Korunması) konularını kapsar; yönetişim ve süreç kontrolleri (Domain 1-3) bu taramanın kapsamı dışındadır ve ayrıca değerlendirilmelidir. Platforma uygulanamayan kontroller N/A olarak gösterilmiş ve skora dahil edilmemiştir.</p>
         <p>Denetim sonucunda toplam <strong>{total}</strong> kontrol gerçekleştirilmiş, bunlardan <strong>{passed}</strong> adedi başarılı, <strong>{failed}</strong> adedi başarısız olarak değerlendirilmiştir.</p>
 
         <div class="score-box">
@@ -824,9 +869,8 @@ def api_report_generate():
 
     if comp_data:
         for c in comp_data.get("checks",[]):
-            cls = "status-pass" if c["status"]=="PASS" else "status-fail"
-            icon = "✅" if c["status"]=="PASS" else "❌"
-            report_html += f'<tr><td>{c["category"]}</td><td>{c["check"]}</td><td class="{cls}">{icon} {c["status"]}</td><td>{c["detail"]}</td></tr>'
+            cls = "status-pass" if c["status"]=="PASS" else "status-fail" if c["status"]=="FAIL" else ""
+            report_html += f'<tr><td>{e(c["category"])}</td><td>{e(c["check"])}</td><td class="{cls}">{c["status"]}</td><td>{e(c["detail"])}</td></tr>'
 
     report_html += f"""
         </table>
@@ -836,7 +880,7 @@ def api_report_generate():
     <div class="section page-break">
         <h2>4. Denetim Bulguları ve Öneriler</h2>
         <p>Aşağıda tespit edilen bulgular, CISA risk değerlendirme metodolojisine göre sınıflandırılmıştır. Her bulgu için etki analizi, olasılık değerlendirmesi, referans standart ve düzeltici eylem önerisi sunulmuştur.</p>
-        {findings_html if findings_html else '<p style="color:var(--green);">✅ Kritik bulgu tespit edilmedi.</p>'}
+        {findings_html if findings_html else '<p style="color:var(--green);">Başarısız kontrol tespit edilmedi.</p>'}
     </div>
 
     <!-- SONUÇ -->
@@ -873,7 +917,7 @@ def api_report_generate():
     </div>
 
     <div class="footer">
-        <p>Bu rapor CISA IT Audit Toolkit tarafından otomatik oluşturulmuştur.</p>
+        <p>Bu rapor CISA IT Audit Toolkit ile otomatik oluşturulmuştur. Otomatik tarama sonuçları denetçi tarafından doğrulanmadan nihai bulgu olarak kullanılmamalıdır.</p>
         <p>Rapor ID: RPT-{now.strftime('%Y%m%d%H%M%S')}-{hashlib.md5(hostname.encode()).hexdigest()[:8].upper()}</p>
         <p>GİZLİLİK: Bu belge sadece yetkili kişiler tarafından görüntülenmelidir.</p>
     </div>
@@ -891,8 +935,8 @@ def api_report_generate():
 
 @app.route("/api/report/download/<filename>")
 def api_report_download(filename):
-    fpath = REPORTS_DIR / filename
-    if fpath.exists():
+    fpath = (REPORTS_DIR / filename).resolve()
+    if fpath.parent == REPORTS_DIR.resolve() and fpath.suffix == ".html" and fpath.exists():
         return send_file(str(fpath), as_attachment=True, download_name=filename)
     return jsonify({"error":"Rapor bulunamadı"}), 404
 
@@ -908,53 +952,58 @@ def api_report_list():
 #  BAŞLATMA
 # ════════════════════════════════════════════════════════════
 
-def start_flask():
-    app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
+def bos_port(tercih):
+    # macOS 12+ 5000 portunu AirPlay Alıcısı için kullanıyor; varsayılan 5050,
+    # o da doluysa sistemin verdiği boş bir port
+    try:
+        with socket.socket() as so:
+            so.bind(("127.0.0.1", tercih))
+        return tercih
+    except OSError:
+        with socket.socket() as so:
+            so.bind(("127.0.0.1", 0))
+            return so.getsockname()[1]
 
 if __name__ == "__main__":
-    import sys
+    import argparse, webbrowser
+    ap = argparse.ArgumentParser(description="CISA IT Audit Toolkit")
+    ap.add_argument("--web", action="store_true", help="pencere yerine tarayıcıda aç")
+    ap.add_argument("--no-open", action="store_true", help="tarayıcıyı otomatik açma")
+    ap.add_argument("--port", type=int, default=5050)
+    args = ap.parse_args()
+    port = bos_port(args.port)
+    if port != args.port:
+        print(f"{args.port} portu kullanımda, {port} kullanılacak.")
+    url = f"http://127.0.0.1:{port}"
 
-    web_mode = "--web" in sys.argv
+    def start_flask():
+        app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
 
-    try:
-        if web_mode:
-            raise ImportError("Web mode forced")
-        import webview
-
-        print("\n  ╔══════════════════════════════════════╗")
-        print("  ║   🛡  CISA IT Audit Toolkit  v2.0    ║")
-        print("  ║   Professional Edition                ║")
-        print("  ╚══════════════════════════════════════╝\n")
-
-        flask_thread = threading.Thread(target=start_flask, daemon=True)
-        flask_thread.start()
-
-        import time; time.sleep(1.5)
-
-        webview.create_window(
-            "CISA IT Audit Toolkit",
-            "http://127.0.0.1:5000",
-            width=1400, height=900,
-            min_size=(1100, 700),
-            background_color="#0b0e14"
-        )
-        webview.start()
-
-    except ImportError:
-        import webbrowser, time
-
-        print("\n  ╔══════════════════════════════════════╗")
-        print("  ║   🛡  CISA IT Audit Toolkit  v2.0    ║")
-        print("  ║   Browser Mode                       ║")
-        print("  ╚══════════════════════════════════════╝\n")
-
-        flask_thread = threading.Thread(target=start_flask, daemon=True)
-        flask_thread.start()
-        time.sleep(1)
-        webbrowser.open("http://127.0.0.1:5000")
-        print("  ✓ Tarayıcıda açıldı: http://127.0.0.1:5000")
-        print("  ✓ Ctrl+C ile kapatın\n")
+    webview = None
+    if not args.web:
         try:
-            while True: time.sleep(1)
-        except KeyboardInterrupt:
-            print("\n  Toolkit kapatıldı.")
+            import webview
+        except ImportError:
+            print("pywebview kurulu değil, tarayıcı modunda açılıyor.")
+
+    print(f"CISA IT Audit Toolkit: {url}  (kapatmak için Ctrl+C)")
+    flask_thread = threading.Thread(target=start_flask, daemon=True)
+    flask_thread.start()
+    time.sleep(1.2)
+    if webview is not None:
+        try:
+            webview.create_window("CISA IT Audit Toolkit", url, width=1400, height=900,
+                                  min_size=(1100, 700), background_color="#0b0e14")
+            webview.start()
+            raise SystemExit(0)
+        except SystemExit:
+            raise
+        except Exception as ex:
+            print(f"Pencere açılamadı ({ex}), tarayıcıdan devam edin: {url}")
+    if not args.no_open:
+        try: webbrowser.open(url)
+        except Exception: pass
+    try:
+        while flask_thread.is_alive(): time.sleep(1)
+    except KeyboardInterrupt:
+        print("Kapatıldı.")

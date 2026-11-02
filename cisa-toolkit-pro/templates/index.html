@@ -216,7 +216,7 @@ table.dt tr:hover td{background:rgba(56,189,248,.02)}
 <aside class="sidebar">
     <div class="sidebar-brand">
         <h1><span class="dot"></span>Audit Toolkit</h1>
-        <span>CISA Professional v2.0</span>
+        <span>v2.0</span>
     </div>
     <nav class="sidebar-nav">
         <div class="nav-group">
@@ -262,7 +262,7 @@ table.dt tr:hover td{background:rgba(56,189,248,.02)}
                 <div class="dash-card" onclick="nav('system')"><div class="card-tag">8 araç</div><div class="card-ico">⊞</div><div class="card-name">Sistem Denetim</div><div class="card-sub">OS bilgisi, güncellemeler, servisler, SSH, kernel, disk, process, cron</div></div>
                 <div class="dash-card" onclick="nav('logs')"><div class="card-tag">4 araç</div><div class="card-ico">☰</div><div class="card-name">Log Analizi</div><div class="card-sub">Auth, sistem, ağ ve kernel loglarında anomali tespiti</div></div>
                 <div class="dash-card" onclick="nav('vuln')"><div class="card-tag">2 araç</div><div class="card-ico">⚠</div><div class="card-name">Zafiyet Tarama</div><div class="card-sub">Nmap entegrasyonu ve OS CVE kontrolü</div></div>
-                <div class="dash-card" onclick="nav('compliance')"><div class="card-tag">16 kontrol</div><div class="card-ico">✓</div><div class="card-name">Uyumluluk</div><div class="card-sub">CISA çerçevesinde tam uyumluluk taraması ve skorlama</div></div>
+                <div class="dash-card" onclick="nav('compliance')"><div class="card-tag">15 kontrol</div><div class="card-ico">✓</div><div class="card-name">Uyumluluk</div><div class="card-sub">Temel sertleştirme kontrolleri ve skorlama</div></div>
             </div>
         </div>
 
@@ -358,7 +358,7 @@ table.dt tr:hover td{background:rgba(56,189,248,.02)}
         <!-- COMPLIANCE -->
         <div id="p-compliance" class="panel">
             <div class="panel-title">Uyumluluk Kontrolü</div>
-            <div class="panel-desc">CISA çerçevesinde kapsamlı güvenlik taraması — 16 otomatik kontrol</div>
+            <div class="panel-desc">Temel güvenlik kontrolleri — 15 otomatik kontrol (platforma uymayanlar N/A)</div>
             <div style="text-align:center;margin-bottom:24px"><button class="btn-sm primary" style="padding:12px 32px;font-size:14px" onclick="compScan()">Tam Uyumluluk Taraması Başlat</button></div>
             <div id="comp-out" style="display:none">
                 <div id="comp-score" class="comp-score"></div>
@@ -402,11 +402,19 @@ document.querySelectorAll('.nav-item[data-panel]').forEach(el=>{
 });
 
 // ═══ API ═══
+// Komut çıktıları (log, banner, whois, nmap) dışarıdan gelen metin içerebilir.
+// Ekrana innerHTML ile basıldığı için tüm metinleri önce kaçırıyoruz.
+function escDeep(v){
+    if(typeof v==='string')return v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    if(Array.isArray(v))return v.map(escDeep);
+    if(v&&typeof v==='object'){const o={};for(const k in v)o[k]=escDeep(v[k]);return o}
+    return v;
+}
 async function api(ep,method='GET',body=null){
-    const o={method,headers:{'Content-Type':'application/json'}};
+    const o={method,headers:{'Content-Type':'application/json','X-Requested-With':'cisa-toolkit'}};
     if(body)o.body=JSON.stringify(body);
     const r=await fetch('/api/'+ep,o);
-    return await r.json();
+    return escDeep(await r.json());
 }
 
 // ═══ GENERIC RUN ═══
@@ -575,9 +583,9 @@ async function compScan(){
     document.getElementById('comp-stats').innerHTML=`<div class="st"><div class="v" style="color:var(--green)">${d.summary.passed}</div><div class="l">Geçti</div></div><div class="st"><div class="v" style="color:var(--red)">${d.summary.failed}</div><div class="l">Başarısız</div></div><div class="st"><div class="v">${d.summary.total}</div><div class="l">Toplam</div></div>`;
     let ch='';
     d.checks.forEach(c=>{
-        const ico=c.status==='PASS'?'✓':'✗';
-        const cls=c.status==='PASS'?'pass':'fail';
-        ch+=`<div class="check-row"><div class="check-ico ${cls}">${ico}</div><div class="check-info"><div class="cn">${c.check}</div><div class="cd">${c.detail}</div><div class="cc">${c.category}</div></div><span class="badge-r b-${c.status==='PASS'?'LOW':'CRITICAL'}">${c.status}</span></div>`;
+        const ico=c.status==='PASS'?'✓':c.status==='FAIL'?'✗':'–';
+        const cls=c.status==='PASS'?'pass':c.status==='FAIL'?'fail':'';
+        ch+=`<div class="check-row"><div class="check-ico ${cls}">${ico}</div><div class="check-info"><div class="cn">${c.check}</div><div class="cd">${c.detail}</div><div class="cc">${c.category}</div></div><span class="badge-r b-${c.status==='PASS'?'LOW':c.status==='FAIL'?'CRITICAL':'INFO'}">${c.status}</span></div>`;
     });
     document.getElementById('comp-checks').innerHTML=ch;
 }
@@ -593,7 +601,8 @@ async function genReport(){
         organization:document.getElementById('rpt-org').value||'Kurum',
         scope:document.getElementById('rpt-scope').value||'Genel IT Denetimi'
     });
-    st.innerHTML=`✅ Rapor oluşturuldu! (Skor: ${d.score}%, ${d.findings_count} bulgu)<br><a href="/api/report/download/${d.filename}" style="color:var(--blue);font-weight:600" download>📥 Raporu İndir</a>`;
+    if(d.error){st.textContent='Hata: '+d.error;st.style.color='var(--red)';return}
+    st.innerHTML=`Rapor oluşturuldu (Skor: ${d.score}%, ${d.findings_count} bulgu)<br><a href="/api/report/download/${d.filename}" style="color:var(--blue);font-weight:600" download>Raporu indir</a>`;
     st.style.color='var(--green)';
 }
 </script>
