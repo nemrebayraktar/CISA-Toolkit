@@ -237,7 +237,7 @@ table.dt tr:hover td{background:rgba(56,189,248,.02)}
             <div class="nav-item" onclick="openReportModal()"><span class="ico">⎙</span>Rapor Oluştur</div>
         </div>
     </nav>
-    <div class="sidebar-footer">v2.0 — localhost:5000</div>
+    <div class="sidebar-footer" id="footer-host">v2.0</div>
 </aside>
 
 <!-- MAIN -->
@@ -389,6 +389,9 @@ table.dt tr:hover td{background:rgba(56,189,248,.02)}
 </div>
 
 <script>
+// uygulama hangi portta açıldıysa onu göster
+document.getElementById('footer-host').textContent='v2.0 — '+location.host;
+
 // ═══ NAV ═══
 function nav(id){
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));

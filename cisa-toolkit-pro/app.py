@@ -176,6 +176,28 @@ def api_access_groups():
 #  2. AĞ GÜVENLİK TARAYICI (Multi-threaded)
 # ════════════════════════════════════════════════════════════
 
+# getservbyport yüksek portlarda çoğu zaman isim bulamıyor, yedek liste
+BILINEN_PORTLAR = {
+    21:"ftp", 22:"ssh", 23:"telnet", 25:"smtp", 53:"dns", 80:"http", 110:"pop3",
+    135:"msrpc", 139:"netbios", 143:"imap", 443:"https", 445:"smb", 1433:"mssql",
+    1521:"oracle", 2375:"docker", 3000:"http-dev", 3306:"mysql", 3389:"rdp",
+    5000:"http/airplay", 5432:"postgresql", 5900:"vnc", 5901:"vnc-1", 6080:"novnc",
+    6379:"redis", 8000:"http-alt", 8080:"http-proxy", 8443:"https-alt",
+    9200:"elasticsearch", 27017:"mongodb",
+}
+
+def servis_bul(port, banner):
+    try: return socket.getservbyport(port)
+    except: pass
+    if port in BILINEN_PORTLAR: return BILINEN_PORTLAR[port]
+    # listede yoksa banner'a bak (HTTP cevabı verdiyse Server satırını al)
+    if banner.startswith("HTTP/"):
+        m = re.search(r"^Server:\s*([^\r\n/ ]+)", banner, re.M | re.I)
+        return f"http ({m.group(1)})" if m else "http"
+    if banner.startswith("SSH-"): return "ssh"
+    if banner.startswith("RFB"): return "vnc"
+    return "unknown"
+
 def scan_port(target, port, timeout):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -187,8 +209,7 @@ def scan_port(target, port, timeout):
                 s.send(b"HEAD / HTTP/1.0\r\n\r\n")
                 banner = s.recv(256).decode("utf-8", errors="ignore").strip()[:100]
             except: pass
-            try: service = socket.getservbyport(port)
-            except: service = "unknown"
+            service = servis_bul(port, banner)
             s.close()
             return {"port":port,"service":service,"state":"open","banner":banner}
         s.close()
